@@ -6,7 +6,7 @@ declare const piexif: any;
 
 /**
  * Converte string para array de bytes UTF-16LE (UCS-2) com terminador nulo duplo.
- * Essencial para que o Windows exiba corretamente acentos e caracteres especiais.
+ * Padrão Windows XP/7/10/11 para metadados.
  */
 const toXPBytes = (str: string): number[] => {
   const bytes: number[] = [];
@@ -20,46 +20,61 @@ const toXPBytes = (str: string): number[] => {
 };
 
 /**
- * Converte para o formato UserComment UNICODE (Prefix + UCS-2)
+ * Converte para o formato UserComment UNICODE (Prefix + UTF-16LE)
+ * Resolve o erro de "Unicode inválido" em visualizadores de fotos.
  */
 const toUnicodeUserComment = (str: string): number[] => {
-  // Prefixo 'UNICODE\0' (8 bytes)
-  const prefix = [85, 78, 73, 67, 79, 68, 69, 0];
-  const ucs2: number[] = [];
+  // Cabeçalho de 8 bytes conforme especificação EXIF 2.3
+  const prefix = [85, 78, 73, 67, 79, 68, 69, 0]; // "UNICODE\0"
+  const bytes: number[] = [...prefix];
   for (let i = 0; i < str.length; i++) {
     const charCode = str.charCodeAt(i);
-    // UserComment UNICODE geralmente espera Big Endian ou depende da arquitetura, 
-    // mas piexif lida bem com a sequência de bytes direta.
-    ucs2.push((charCode >> 8) & 0xFF);
-    ucs2.push(charCode & 0xFF);
+    // Grava em Little Endian (padrão mais compatível)
+    bytes.push(charCode & 0xFF);
+    bytes.push((charCode >> 8) & 0xFF);
   }
-  return prefix.concat(ucs2);
+  return bytes;
 };
 
 /**
- * Sanitiza string para ASCII puro (remove acentos para campos legados)
+ * Sanitiza string para ASCII puro (remove acentos para campos legados de compatibilidade)
  */
 const toAsciiSafe = (str: string): string => {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x00-\x7F]/g, "");
+  if (!str) return "";
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x00-\x7F]/g, "");
 };
 
 export const readExif = (file: File): Promise<ImageMetadata> => {
   return new Promise((resolve) => {
+    if (typeof EXIF === 'undefined') {
+      console.warn("EXIF library not loaded");
+      resolve({});
+      return;
+    }
+
     if (file.type !== "image/jpeg" && file.type !== "image/jpg") {
       resolve({});
       return;
     }
+
     EXIF.getData(file, function(this: any) {
       const all = EXIF.getAllTags(this);
       
       const fromXP = (bytes: any) => {
         if (!bytes || !Array.isArray(bytes)) return "";
-        let str = "";
-        for (let i = 0; i < bytes.length; i += 2) {
-          if (i + 1 >= bytes.length || (bytes[i] === 0 && bytes[i + 1] === 0)) break;
-          str += String.fromCharCode(bytes[i] + (bytes[i + 1] << 8));
+        try {
+          let str = "";
+          for (let i = 0; i < bytes.length; i += 2) {
+            if (i + 1 >= bytes.length || (bytes[i] === 0 && bytes[i + 1] === 0)) break;
+            str += String.fromCharCode(bytes[i] + (bytes[i + 1] << 8));
+          }
+          return str;
+        } catch (e) {
+          return "";
         }
-        return str;
       };
 
       resolve({
@@ -79,19 +94,21 @@ export const readExif = (file: File): Promise<ImageMetadata> => {
 
 export const writeExif = (dataUrl: string, metadata: ImageMetadata): string => {
   if (!dataUrl.startsWith("data:image/jpeg")) return dataUrl;
+  if (typeof piexif === 'undefined') {
+    console.error("piexif library not loaded");
+    return dataUrl;
+  }
 
   try {
     const cleanDataUrl = piexif.remove(dataUrl);
     const zeroth: any = {};
     const exif: any = {};
 
-    // 1. Título e Descrição básica (Convertemos para ASCII seguro para evitar erro de Unicode inválido em leitores antigos)
     if (metadata.title) {
       zeroth[piexif.ImageIFD.ImageDescription] = toAsciiSafe(metadata.title);
       zeroth[piexif.ImageIFD.XPTitle] = toXPBytes(metadata.title);
     }
 
-    // 2. XPComment (Descrição detalhada com suporte a acentos no Windows)
     if (metadata.description) {
       zeroth[piexif.ImageIFD.XPComment] = toXPBytes(metadata.description);
     }
@@ -100,7 +117,6 @@ export const writeExif = (dataUrl: string, metadata: ImageMetadata): string => {
       zeroth[piexif.ImageIFD.XPSubject] = toXPBytes(metadata.subject);
     }
 
-    // 3. Estrelas
     const stars = (metadata.rating?.match(/★/g) || []).length || 5;
     zeroth[piexif.ImageIFD.Rating] = stars;
     const ratingMap: {[key: number]: number} = {1: 1, 2: 25, 3: 50, 4: 75, 5: 99};
@@ -111,7 +127,6 @@ export const writeExif = (dataUrl: string, metadata: ImageMetadata): string => {
       zeroth[piexif.ImageIFD.XPAuthor] = toXPBytes(metadata.artist);
     }
 
-    // 4. Tags (Keywords) - Usando UNICODE no UserComment e XPKeywords para o Windows
     if (metadata.userComment) {
       const formattedTags = metadata.userComment.split(/[,;]/).map(t => t.trim()).filter(t => t).join("; ");
       zeroth[piexif.ImageIFD.XPKeywords] = toXPBytes(formattedTags);
@@ -129,16 +144,21 @@ export const writeExif = (dataUrl: string, metadata: ImageMetadata): string => {
     const exifBytes = piexif.dump(exifObj);
     return piexif.insert(exifBytes, cleanDataUrl);
   } catch (error) {
-    console.error("Erro ao gravar EXIF:", error);
+    console.error("Erro crítico ao gravar EXIF:", error);
+    // Fallback: retorna a imagem original sem metadados se houver erro de Unicode
     return dataUrl;
   }
 };
 
 export const downloadImage = (dataUrl: string, fileName: string) => {
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  try {
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    console.error("Download failed:", e);
+  }
 };

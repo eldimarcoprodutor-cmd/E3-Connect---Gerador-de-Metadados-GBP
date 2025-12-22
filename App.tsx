@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { ImageUploader } from './components/ImageUploader';
 import { MetadataEditor } from './components/MetadataEditor';
@@ -18,20 +18,55 @@ const App: React.FC = () => {
     addVisualTitle: false,
   });
 
+  // Verifica se as libs externas carregaram (importante para evitar erros silenciosos na Vercel)
+  useEffect(() => {
+    const checkLibs = () => {
+      if (typeof (window as any).EXIF === 'undefined' || typeof (window as any).piexif === 'undefined') {
+        setState(prev => ({ ...prev, error: "Serviços de imagem ainda carregando... Reinicie se o erro persistir." }));
+      } else {
+        setState(prev => ({ ...prev, error: null }));
+      }
+    };
+    const timer = setTimeout(checkLibs, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setState(prev => ({ ...prev, error: "Por favor, envie apenas arquivos de imagem." }));
+      return;
+    }
+
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     const reader = new FileReader();
+    
+    reader.onerror = () => {
+      setState(prev => ({ ...prev, isLoading: false, error: "Falha ao ler o arquivo." }));
+    };
+
     reader.onload = async (e) => {
       const dataUrl = e.target?.result as string;
-      const initialMetadata = await readExif(file);
-      setState(prev => ({
-        ...prev,
-        currentImage: dataUrl,
-        fileName: file.name,
-        mimeType: file.type,
-        metadata: initialMetadata,
-        isLoading: false,
-      }));
+      try {
+        const initialMetadata = await readExif(file);
+        setState(prev => ({
+          ...prev,
+          currentImage: dataUrl,
+          fileName: file.name,
+          mimeType: file.type,
+          metadata: initialMetadata,
+          isLoading: false,
+        }));
+      } catch (err) {
+        setState(prev => ({
+          ...prev,
+          currentImage: dataUrl,
+          fileName: file.name,
+          mimeType: file.type,
+          metadata: {},
+          isLoading: false,
+          error: "Erro ao ler metadados. Você ainda pode editar manualmente."
+        }));
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -45,7 +80,7 @@ const App: React.FC = () => {
 
   const handleAISuggestions = async () => {
     if (!state.currentImage || !state.mimeType) return;
-    setState(prev => ({ ...prev, isLoading: true }));
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     try {
       const suggestions = await getAISuggestions(state.currentImage, state.mimeType);
       setState(prev => ({
@@ -61,46 +96,50 @@ const App: React.FC = () => {
         isLoading: false
       }));
     } catch (err: any) {
-      setState(prev => ({ ...prev, isLoading: false, error: err.message }));
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: "A IA encontrou um problema. Verifique sua conexão ou tente novamente." 
+      }));
     }
   };
 
   const processImage = async (dataUrl: string, metadata: ImageMetadata, addText: boolean): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onerror = () => resolve(dataUrl);
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(dataUrl);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(dataUrl);
 
-        ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0);
 
-        if (addText && metadata.title) {
-          // Ajuste dinâmico de fonte baseado na resolução
-          const fontSize = Math.max(32, Math.floor(canvas.width / 35));
-          ctx.font = `900 ${fontSize}px Inter, system-ui, sans-serif`;
-          
-          const text = metadata.title.toUpperCase();
-          const padding = fontSize * 0.8;
-          
-          // Efeito de sombra projetada para legibilidade sem barra sólida
-          ctx.shadowColor = "rgba(0,0,0,0.8)";
-          ctx.shadowBlur = 15;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 4;
-          
-          // Posicionamento no rodapé com margem segura
-          ctx.fillStyle = 'white';
-          ctx.textAlign = 'center';
-          ctx.fillText(text, canvas.width / 2, canvas.height - padding);
-          
-          // Reset shadow para não afetar outros processos
-          ctx.shadowBlur = 0;
+          if (addText && metadata.title) {
+            const fontSize = Math.max(24, Math.floor(canvas.width / 40));
+            ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+            
+            const text = metadata.title.toUpperCase();
+            const padding = fontSize * 1.5;
+            
+            ctx.shadowColor = "rgba(0,0,0,0.85)";
+            ctx.shadowBlur = 12;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 4;
+            
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, canvas.width / 2, canvas.height - padding);
+          }
+
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
+        } catch (e) {
+          resolve(dataUrl);
         }
-
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
       };
       img.src = dataUrl;
     });
@@ -114,16 +153,19 @@ const App: React.FC = () => {
       const processedBase64 = await processImage(state.currentImage, state.metadata, state.addVisualTitle);
       const finalImageWithExif = writeExif(processedBase64, state.metadata);
       
-      // Nome do arquivo é o título preenchido
-      let downloadName = state.metadata.title ? state.metadata.title.trim() : state.fileName.replace(/\.[^/.]+$/, "");
+      let downloadName = state.metadata.title 
+        ? state.metadata.title.trim() 
+        : state.fileName.replace(/\.[^/.]+$/, "");
       
-      // Limpeza básica apenas para evitar erros de sistema de arquivos, mantendo espaços
-      downloadName = downloadName.replace(/[\\/:*?"<>|]/g, "") + ".jpg";
+      // Limpeza rigorosa de caracteres especiais para evitar erro no download
+      downloadName = downloadName
+        .replace(/[\\/:*?"<>|]/g, "")
+        .substring(0, 150); // Limita tamanho do nome
 
-      downloadImage(finalImageWithExif, downloadName);
+      downloadImage(finalImageWithExif, `${downloadName}.jpg`);
     } catch (e) {
       console.error(e);
-      alert("Erro ao processar imagem.");
+      setState(prev => ({ ...prev, error: "Erro ao salvar imagem. Tente reduzir o título." }));
     } finally {
       setState(prev => ({ ...prev, isLoading: false }));
     }
@@ -131,6 +173,13 @@ const App: React.FC = () => {
 
   return (
     <Layout>
+      {state.error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-400 text-sm flex justify-between items-center animate-pulse">
+          <span>{state.error}</span>
+          <button onClick={() => setState({...state, error: null})} className="font-bold">✕</button>
+        </div>
+      )}
+
       {!state.currentImage ? (
         <div className="max-w-2xl mx-auto mt-12 text-center space-y-6">
           <div className="space-y-2">
@@ -153,7 +202,7 @@ const App: React.FC = () => {
                 <img src={state.currentImage} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl" alt="Original" />
               </div>
               <div className="p-4 bg-slate-950/50 text-[10px] text-slate-500">
-                <p>Nome Original: {state.fileName}</p>
+                <p>Arquivo: {state.fileName}</p>
               </div>
             </div>
           </div>
