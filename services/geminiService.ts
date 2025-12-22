@@ -2,13 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AISuggestion } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const getAISuggestions = async (base64Image: string, mimeType: string): Promise<AISuggestion> => {
   try {
-    const model = 'gemini-3-flash-preview';
+    // Inicializa o cliente apenas no momento do uso para garantir que process.env.API_KEY esteja disponível
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const modelName = 'gemini-3-flash-preview';
+    
     const response = await ai.models.generateContent({
-      model,
+      model: modelName,
       contents: [
         {
           parts: [
@@ -43,9 +44,12 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
       },
     });
 
-    return JSON.parse(response.text) as AISuggestion;
+    const text = response.text;
+    if (!text) throw new Error("Resposta da IA vazia");
+    
+    return JSON.parse(text) as AISuggestion;
   } catch (error) {
-    console.error("Erro Gemini:", error);
+    console.error("Erro Gemini Service:", error);
     throw new Error("Falha ao gerar sugestões. Tente preencher manualmente.");
   }
 };
