@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AISuggestion } from "../types";
 
 export const getAISuggestions = async (base64Image: string, mimeType: string): Promise<AISuggestion> => {
-  // Inicialização obrigatória usando a chave injetada no ambiente
+  // Cria uma nova instância a cada chamada para garantir o uso da API Key atualizada
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -19,20 +19,19 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
               },
             },
             {
-              text: `Você é um especialista em SEO Local e Google Business Profile (GBP). 
-              Analise esta imagem e gere metadados estratégicos.
+              text: `Você é um consultor sênior de SEO Local especializado em Google Business Profile.
               
-              REGRAS CRÍTICAS PARA A DESCRIÇÃO:
-              A descrição deve ser obrigatoriamente uma lista de frases hifenizadas separadas por vírgula, seguindo exatamente este estilo:
-              'Case-de-Sucesso-Google-Meu-Negócio, Otimização-de-Perfil-GBP-Cidade, Diagnóstico-Gratuito-Google-Maps, Aumento-de-Ligações-Sem-Anúncios, SEO-Local-Estado, Correção-de-Categorias-Google, Fotos-Estratégicas-para-GBP, Perfil-que-Converte-Clientes, Nome-da-Marca-Consultoria, Vendedor-24h-Google-Maps'
+              REGRAS OBRIGATÓRIAS PARA O CAMPO DESCRIPTION:
+              A descrição deve conter exatamente estes termos (ou variações muito próximas adaptadas ao contexto da imagem), sempre em formato hifenizado e separados por vírgula:
+              'Case-de-Sucesso-Google-Meu-Negócio, Otimização-de-Perfil-GBP-Boa-Vista, Diagnóstico-Gratuito-Google-Maps, Aumento-de-Ligações-Sem-Anúncios, SEO-Local-Roraima, Correção-de-Categorias-Google, Fotos-Estratégicas-para-GBP, Perfil-que-Converte-Clientes, E3-Connect-Consultoria-RR, Vendedor-24h-Google-Maps'.
 
               REGRAS GERAIS:
-              1. Título: 'Serviço Principal + Em + Cidade/Bairro - Nome da Marca'.
-              2. Assunto: Categoria exata de serviço.
+              1. Título: 'Serviço Identificado + Em Boa Vista - E3 Connect'.
+              2. Assunto: Categoria do serviço (ex: Ar Condicionado, Advocacia, etc).
               3. Rating: Sempre '★★★★★'.
-              4. Tags: 10 palavras-chave curtas separadas por vírgula.
-              
-              Retorne APENAS o JSON estruturado.`,
+              4. Tags: 10 palavras-chave estratégicas separadas por vírgula.
+
+              Retorne o resultado estritamente em JSON.`,
             },
           ],
         },
@@ -44,10 +43,7 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
           properties: {
             title: { type: Type.STRING },
             subject: { type: Type.STRING },
-            description: { 
-              type: Type.STRING,
-              description: "Lista de frases hifenizadas separadas por vírgula para SEO Local."
-            },
+            description: { type: Type.STRING },
             rating: { type: Type.STRING },
             tags: {
               type: Type.ARRAY,
@@ -60,11 +56,11 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
     });
 
     const text = response.text;
-    if (!text) throw new Error("A IA retornou uma resposta vazia.");
+    if (!text) throw new Error("Resposta da IA vazia.");
     
     return JSON.parse(text) as AISuggestion;
-  } catch (error) {
-    console.error("Erro Crítico Gemini:", error);
-    throw new Error("Falha na IA. Verifique sua chave de API ou conexão.");
+  } catch (error: any) {
+    console.error("Erro Gemini Service:", error);
+    throw error;
   }
 };
