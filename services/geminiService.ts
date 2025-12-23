@@ -19,7 +19,20 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
               },
             },
             {
-              text: "Você é um especialista em SEO Local e Google Business Profile. Analise esta imagem e gere metadados para maximizar o ranqueamento local.\n\nRegras:\n1. Título: 'Serviço Principal + Em + Cidade/Bairro - Nome da Marca'.\n2. Assunto: Categoria exata de serviço (ex: Manutenção Predial).\n3. Rating: Sempre '★★★★★'.\n4. Descrição: Texto rico em palavras-chave com prova social e CTA.\n5. Tags: 10 tags separadas por vírgula, sem espaços entre elas.\n\nRetorne APENAS o JSON estruturado.",
+              text: `Você é um especialista em SEO Local e Google Business Profile (GBP). 
+              Analise esta imagem e gere metadados estratégicos.
+              
+              REGRAS CRÍTICAS PARA A DESCRIÇÃO:
+              A descrição deve ser obrigatoriamente uma lista de frases hifenizadas separadas por vírgula, seguindo exatamente este estilo:
+              'Case-de-Sucesso-Google-Meu-Negócio, Otimização-de-Perfil-GBP-Cidade, Diagnóstico-Gratuito-Google-Maps, Aumento-de-Ligações-Sem-Anúncios, SEO-Local-Estado, Correção-de-Categorias-Google, Fotos-Estratégicas-para-GBP, Perfil-que-Converte-Clientes, Nome-da-Marca-Consultoria, Vendedor-24h-Google-Maps'
+
+              REGRAS GERAIS:
+              1. Título: 'Serviço Principal + Em + Cidade/Bairro - Nome da Marca'.
+              2. Assunto: Categoria exata de serviço.
+              3. Rating: Sempre '★★★★★'.
+              4. Tags: 10 palavras-chave curtas separadas por vírgula.
+              
+              Retorne APENAS o JSON estruturado.`,
             },
           ],
         },
@@ -31,7 +44,10 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
           properties: {
             title: { type: Type.STRING },
             subject: { type: Type.STRING },
-            description: { type: Type.STRING },
+            description: { 
+              type: Type.STRING,
+              description: "Lista de frases hifenizadas separadas por vírgula para SEO Local."
+            },
             rating: { type: Type.STRING },
             tags: {
               type: Type.ARRAY,
