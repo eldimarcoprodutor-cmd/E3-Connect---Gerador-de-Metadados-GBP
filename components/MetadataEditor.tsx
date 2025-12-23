@@ -5,6 +5,7 @@ import { ImageMetadata } from '../types';
 interface MetadataEditorProps {
   metadata: ImageMetadata;
   addVisualTitle: boolean;
+  hasApiKey: boolean;
   onToggleVisualTitle: (val: boolean) => void;
   onChange: (field: keyof ImageMetadata, value: string) => void;
   onAISuggest: () => void;
@@ -15,6 +16,7 @@ interface MetadataEditorProps {
 export const MetadataEditor: React.FC<MetadataEditorProps> = ({ 
   metadata, 
   addVisualTitle,
+  hasApiKey,
   onToggleVisualTitle,
   onChange, 
   onAISuggest, 
@@ -49,16 +51,22 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span className="w-2 h-6 bg-indigo-500 rounded-full inline-block"></span>
-            Editor Manual
+            Editor de Metadados
           </h2>
-          <p className="text-xs text-slate-400 mt-1">Preencha e clique em fixar para gravar no arquivo.</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {hasApiKey ? "A IA está pronta para sugerir dados." : "⚠️ Conecte sua API Key para usar a IA."}
+          </p>
         </div>
         <button 
           onClick={onAISuggest}
           disabled={isProcessing || isSaving}
-          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-indigo-500/30 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-30"
+          className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all disabled:opacity-30 ${
+            !hasApiKey 
+              ? "border-amber-500/30 text-amber-400 hover:bg-amber-600 hover:text-white" 
+              : "border-indigo-500/30 text-indigo-400 hover:bg-indigo-600 hover:text-white"
+          }`}
         >
-          {isProcessing ? "Gerando..." : "Sugerir com IA"}
+          {isProcessing ? "Gerando..." : !hasApiKey ? "Conectar IA" : "Sugerir com IA"}
         </button>
       </div>
 
@@ -99,9 +107,8 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
             <div className="w-10 h-5 bg-slate-800 rounded-full peer peer-checked:bg-indigo-600 transition-colors"></div>
             <div className="absolute left-1 top-1 w-3 h-3 bg-slate-400 rounded-full peer-checked:left-6 peer-checked:bg-white transition-all"></div>
           </div>
-          <span className="text-xs font-bold text-slate-300 group-hover:text-white">Adicionar nome (título) visualmente na imagem</span>
+          <span className="text-xs font-bold text-slate-300 group-hover:text-white">Estampar título visualmente na foto</span>
         </label>
-        <p className="text-[10px] text-slate-500 italic ml-13">Isso irá "escrever" o título no canto inferior da imagem antes de salvar.</p>
       </div>
 
       <button
@@ -109,7 +116,7 @@ export const MetadataEditor: React.FC<MetadataEditorProps> = ({
         disabled={isSaving || isProcessing}
         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50"
       >
-        {isSaving ? "FIXANDO DADOS..." : "FIXAR METADADOS E BAIXAR IMAGEM"}
+        {isSaving ? "FIXANDO DADOS..." : "FIXAR DADOS E BAIXAR IMAGEM"}
       </button>
     </div>
   );
