@@ -1,7 +1,5 @@
 {
   "name": "MetaMorph - Editor de Metadados",
   "description": "Uma ferramenta sofisticada para visualizar, editar e otimizar metadados de imagem (EXIF) com sugestões de IA para títulos e descrições.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "requestFramePermissions": []
 }

@@ -3,13 +3,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AISuggestion } from "../types";
 
 export const getAISuggestions = async (base64Image: string, mimeType: string): Promise<AISuggestion> => {
+  // Inicializamos o cliente dentro da função para garantir que a chave de API esteja disponível no contexto de execução
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   try {
-    // Inicializa o cliente apenas no momento do uso para garantir que process.env.API_KEY esteja disponível
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const modelName = 'gemini-3-flash-preview';
-    
     const response = await ai.models.generateContent({
-      model: modelName,
+      model: 'gemini-3-flash-preview',
       contents: [
         {
           parts: [
@@ -20,7 +19,7 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
               },
             },
             {
-              text: "Analise esta imagem de marketing local. Ela contém elementos de confiança, reviews do Google e autoridade. Gere metadados de altíssima conversão (SEO Local):\n\n1. Título: Nome do Serviço + Palavra-chave de Localidade + Nome da Marca (ex: Consultoria Google Maps em São Paulo - E3 Connect).\n2. Assunto: Categoria exata do serviço.\n3. Avaliação: Sempre ★★★★★.\n4. Descrição: Um parágrafo matador focando em 'prova social' e 'resultados' para indexar no Google Imagens.\n5. Tags: 10 tags estratégicas separadas por vírgula.\n\nFoque em termos como: Ranking, Google Maps, Avaliações, Autoridade Local, SEO.",
+              text: "Analise esta imagem focando em SEO Local e Marketing de Autoridade. Gere metadados otimizados para indexação no Google Imagens e Google Maps.\n\nInstruções de Conteúdo:\n1. Título: Formato 'Serviço em Cidade - Nome da Marca'.\n2. Assunto: Categoria exata do negócio.\n3. Rating: Retorne '★★★★★'.\n4. Descrição: Texto persuasivo com gatilhos de confiança e autoridade.\n5. Tags: 10 palavras-chave estratégicas separadas por vírgula.\n\nRetorne obrigatoriamente um JSON puro seguindo o esquema definido.",
             },
           ],
         },
@@ -44,12 +43,13 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
       },
     });
 
+    // Acessa a propriedade .text diretamente conforme as diretrizes do SDK
     const text = response.text;
-    if (!text) throw new Error("Resposta da IA vazia");
+    if (!text) throw new Error("A IA não retornou nenhum conteúdo válido.");
     
     return JSON.parse(text) as AISuggestion;
   } catch (error) {
-    console.error("Erro Gemini Service:", error);
-    throw new Error("Falha ao gerar sugestões. Tente preencher manualmente.");
+    console.error("Erro na comunicação com Gemini IA:", error);
+    throw new Error("Não foi possível obter sugestões da IA no momento. Por favor, preencha manualmente.");
   }
 };
