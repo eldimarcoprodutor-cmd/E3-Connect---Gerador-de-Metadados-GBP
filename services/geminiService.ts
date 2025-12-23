@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AISuggestion } from "../types";
 
 export const getAISuggestions = async (base64Image: string, mimeType: string): Promise<AISuggestion> => {
-  // Cria uma nova instância a cada chamada para garantir o uso da API Key atualizada
+  // Inicialização obrigatória usando a chave injetada no ambiente
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -19,19 +19,19 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
               },
             },
             {
-              text: `Você é um consultor sênior de SEO Local especializado em Google Business Profile.
+              text: `Você é um especialista em SEO Local e Google Business Profile para a agência E3 Connect em Boa Vista, Roraima.
               
               REGRAS OBRIGATÓRIAS PARA O CAMPO DESCRIPTION:
-              A descrição deve conter exatamente estes termos (ou variações muito próximas adaptadas ao contexto da imagem), sempre em formato hifenizado e separados por vírgula:
-              'Case-de-Sucesso-Google-Meu-Negócio, Otimização-de-Perfil-GBP-Boa-Vista, Diagnóstico-Gratuito-Google-Maps, Aumento-de-Ligações-Sem-Anúncios, SEO-Local-Roraima, Correção-de-Categorias-Google, Fotos-Estratégicas-para-GBP, Perfil-que-Converte-Clientes, E3-Connect-Consultoria-RR, Vendedor-24h-Google-Maps'.
+              Você DEVE gerar uma descrição que contenha EXATAMENTE esta lista de frases hifenizadas separadas por vírgula:
+              'Case-de-Sucesso-Google-Meu-Negócio, Otimização-de-Perfil-GBP-Boa-Vista, Diagnóstico-Gratuito-Google-Maps, Aumento-de-Ligações-Sem-Anúncios, SEO-Local-Roraima, Correção-de-Categorias-Google, Fotos-Estratégicas-para-GBP, Perfil-que-Converte-Clientes, E3-Connect-Consultoria-RR, Vendedor-24h-Google-Maps'
 
-              REGRAS GERAIS:
-              1. Título: 'Serviço Identificado + Em Boa Vista - E3 Connect'.
-              2. Assunto: Categoria do serviço (ex: Ar Condicionado, Advocacia, etc).
+              REGRAS ADICIONAIS:
+              1. Título: Gere um título SEO (Serviço + em Boa Vista - E3 Connect).
+              2. Assunto: Categoria do serviço identificado na foto.
               3. Rating: Sempre '★★★★★'.
-              4. Tags: 10 palavras-chave estratégicas separadas por vírgula.
-
-              Retorne o resultado estritamente em JSON.`,
+              4. Tags: 10 palavras-chave curtas relacionadas ao negócio.
+              
+              Retorne o resultado estritamente no formato JSON definido.`,
             },
           ],
         },
@@ -56,11 +56,11 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
     });
 
     const text = response.text;
-    if (!text) throw new Error("Resposta da IA vazia.");
+    if (!text) throw new Error("A IA não retornou conteúdo. Verifique sua conexão ou chave de API.");
     
     return JSON.parse(text) as AISuggestion;
   } catch (error: any) {
-    console.error("Erro Gemini Service:", error);
+    console.error("Erro no Gemini Service:", error);
     throw error;
   }
 };
