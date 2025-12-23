@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AISuggestion } from "../types";
 
 export const getAISuggestions = async (base64Image: string, mimeType: string): Promise<AISuggestion> => {
-  // Inicializamos o cliente dentro da função para garantir que a chave de API esteja disponível no contexto de execução
+  // Inicialização obrigatória usando a chave injetada no ambiente
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -19,7 +19,7 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
               },
             },
             {
-              text: "Analise esta imagem focando em SEO Local e Marketing de Autoridade. Gere metadados otimizados para indexação no Google Imagens e Google Maps.\n\nInstruções de Conteúdo:\n1. Título: Formato 'Serviço em Cidade - Nome da Marca'.\n2. Assunto: Categoria exata do negócio.\n3. Rating: Retorne '★★★★★'.\n4. Descrição: Texto persuasivo com gatilhos de confiança e autoridade.\n5. Tags: 10 palavras-chave estratégicas separadas por vírgula.\n\nRetorne obrigatoriamente um JSON puro seguindo o esquema definido.",
+              text: "Você é um especialista em SEO Local e Google Business Profile. Analise esta imagem e gere metadados para maximizar o ranqueamento local.\n\nRegras:\n1. Título: 'Serviço Principal + Em + Cidade/Bairro - Nome da Marca'.\n2. Assunto: Categoria exata de serviço (ex: Manutenção Predial).\n3. Rating: Sempre '★★★★★'.\n4. Descrição: Texto rico em palavras-chave com prova social e CTA.\n5. Tags: 10 tags separadas por vírgula, sem espaços entre elas.\n\nRetorne APENAS o JSON estruturado.",
             },
           ],
         },
@@ -43,13 +43,12 @@ export const getAISuggestions = async (base64Image: string, mimeType: string): P
       },
     });
 
-    // Acessa a propriedade .text diretamente conforme as diretrizes do SDK
     const text = response.text;
-    if (!text) throw new Error("A IA não retornou nenhum conteúdo válido.");
+    if (!text) throw new Error("A IA retornou uma resposta vazia.");
     
     return JSON.parse(text) as AISuggestion;
   } catch (error) {
-    console.error("Erro na comunicação com Gemini IA:", error);
-    throw new Error("Não foi possível obter sugestões da IA no momento. Por favor, preencha manualmente.");
+    console.error("Erro Crítico Gemini:", error);
+    throw new Error("Falha na IA. Verifique sua chave de API ou conexão.");
   }
 };
